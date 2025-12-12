@@ -39,7 +39,7 @@ public class Program
         StreamReader? sr = process.StandardOutput;
         if (sr is null) Environment.Exit(1);
         Regex rx = new Regex(@"(?:^|\n).(?:\d{6}) (\d{6}) (?:[a-z0-9]{40}) ([a-z0-9]{40}) ([A-Z])\s+(.*)");
-        string res1 = sr.ReadToEnd();;
+        string res1 = sr.ReadToEnd(); ;
         MatchCollection cache = rx.Matches(res1);
         procstart = new("git", new string[] { "read-tree", targetname });
         procstart.Environment.Add("GIT_INDEX_FILE", tmp);
@@ -52,7 +52,7 @@ public class Program
             gargs[4] = m.Groups[2].Value;
             gargs[5] = m.Groups[4].Value;
             procstart = new("git", gargs);
-            Console.WriteLine(string.Join(" ",gargs));
+            Console.WriteLine(string.Join(" ", gargs));
             procstart.Environment.Add("GIT_INDEX_FILE", tmp);
             Process.Start(procstart)?.WaitForExit();
         }
@@ -61,17 +61,26 @@ public class Program
         process = Process.Start(procstart);
         if (process is null) Environment.Exit(1);
         StreamReader? sr2 = process.StandardOutput;
-        if (sr2 is null)Environment.Exit(1);
+        if (sr2 is null) Environment.Exit(1);
         string commitmessage = mktmp();
-        procstart = new(Environment.GetEnvironmentVariable("EDITOR") ?? "nano",new string[]{commitmessage});
+        procstart = new(Environment.GetEnvironmentVariable("EDITOR") ?? "nano", new string[] { commitmessage });
         process = Process.Start(procstart);
         if (process is null) Environment.Exit(1);
         process.WaitForExit();
         string? treeish = sr2.ReadLine();
         Console.WriteLine(treeish);
         Console.WriteLine(args[0]);
-        procstart = new("git", new string[] { "commit-tree",treeish??"","-p",targetname,"-F",commitmessage,"-S" });
+        procstart = new("git", new string[] { "commit-tree", treeish ?? "", "-p", targetname, "-F", commitmessage, "-S" }){RedirectStandardOutput = true};
         procstart.Environment.Add("GIT_INDEX_FILE", tmp);
-        Process.Start(procstart)?.WaitForExit();
+        process = Process.Start(procstart);
+        if (process is null) Environment.Exit(1);
+        process.WaitForExit();
+        if (process.ExitCode == 0 && process.StandardOutput is StreamReader sr3 && sr3.ReadLine() is string commitish)
+        {
+            Console.WriteLine(commitish);
+            procstart = new("git", new string[] { "branch","-f",targetname, commitish});
+            procstart.Environment.Add("GIT_INDEX_FILE", tmp);
+            Process.Start(procstart);
+        }
     }
 }
