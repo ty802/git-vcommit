@@ -44,15 +44,22 @@ public class Program
         procstart = new("git", new string[] { "read-tree", targetname });
         procstart.Environment.Add("GIT_INDEX_FILE", tmp);
         Process.Start(procstart)?.WaitForExit();
-        string[] gargs;
-        gargs = new string[6] { "update-index", "--add", "--cacheinfo", null, null, null };
+        string[] gargs = new string[6] { "update-index", "--add", "--cacheinfo", null, null, null };
+        string[] rmargs = new string[2] {"rm",null}
         foreach (Match m in cache)
         {
+            if(m.Groups[3].Value == "D")
+            {
+                    rmargs[1] = m.Groups[4].Value;
+                    procstart = new("git", rmargs);
+                    goto RUN;
+            }
             gargs[3] = m.Groups[1].Value;
             gargs[4] = m.Groups[2].Value;
             gargs[5] = m.Groups[4].Value;
             procstart = new("git", gargs);
             Console.WriteLine(string.Join(" ", gargs));
+            RUN:
             procstart.Environment.Add("GIT_INDEX_FILE", tmp);
             Process.Start(procstart)?.WaitForExit();
         }
