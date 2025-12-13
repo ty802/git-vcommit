@@ -45,7 +45,7 @@ public class Program
         procstart.Environment.Add("GIT_INDEX_FILE", tmp);
         Process.Start(procstart)?.WaitForExit();
         string[] gargs = new string[6] { "update-index", "--add", "--cacheinfo", null, null, null };
-        string[] rmargs = new string[2] {"rm",null}
+        string[] rmargs = new string[2] {"rm",null};
         foreach (Match m in cache)
         {
             if(m.Groups[3].Value == "D")
