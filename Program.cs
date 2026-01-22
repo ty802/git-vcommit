@@ -298,9 +298,11 @@ public class Program
         };
 
         var process = Process.Start(psi);
-        process?.WaitForExit();
+        if (process == null)
+            return false;
 
-        return process?.ExitCode == 0;
+        process.WaitForExit();
+        return process.ExitCode == 0;
     }
 
     static bool ShouldGpgSign(Repository repo, Options opts)
@@ -338,12 +340,19 @@ public class Program
             psi.Environment["GIT_COMMITTER_DATE"] = committer.When.ToString("yyyy-MM-dd HH:mm:ss zzz");
 
             var process = Process.Start(psi);
-            string? commitSha = process?.StandardOutput.ReadLine();
-            string? errors = process?.StandardError.ReadToEnd();
-            process?.WaitForExit();
+            if (process == null)
+            {
+                File.Delete(messageFile);
+                Console.Error.WriteLine("fatal: failed to start git commit-tree process");
+                Environment.Exit(1);
+            }
+
+            string? commitSha = process.StandardOutput.ReadLine();
+            string? errors = process.StandardError.ReadToEnd();
+            process.WaitForExit();
             File.Delete(messageFile);
 
-            if (process?.ExitCode != 0 || string.IsNullOrEmpty(commitSha))
+            if (process.ExitCode != 0 || string.IsNullOrEmpty(commitSha))
             {
                 if (!string.IsNullOrEmpty(errors))
                     Console.Error.Write(errors);
@@ -375,14 +384,16 @@ public class Program
         repo.Refs.UpdateTarget(reference, commit.Id, reflogMessage);
 
         // Output similar to git commit
-        var parent = commit.Parents.First();
-        var diff = repo.Diff.Compare<Patch>(parent.Tree, commit.Tree);
-        int filesChanged = diff.Count();
-        int insertions = diff.LinesAdded;
-        int deletions = diff.LinesDeleted;
-
-        Console.WriteLine($"[{branchName} {commit.Sha.Substring(0, 7)}] {commit.MessageShort}");
-        Console.WriteLine($" {filesChanged} file{(filesChanged != 1 ? "s" : "")} changed, {insertions} insertion{(insertions != 1 ? "s" : "")}(+), {deletions} deletion{(deletions != 1 ? "s" : "")}(-)");
+        // Note: Stats calculation disabled for AOT compatibility
+        var parents = commit.Parents.ToList();
+        if (parents.Count == 0)
+        {
+            Console.WriteLine($"[{branchName} (root-commit) {commit.Sha.Substring(0, 7)}] {commit.MessageShort}");
+        }
+        else
+        {
+            Console.WriteLine($"[{branchName} {commit.Sha.Substring(0, 7)}] {commit.MessageShort}");
+        }
     }
 
     static void ShowDryRun(Options opts, TreeChanges changes, Commit targetCommit)
@@ -484,7 +495,14 @@ public class Program
             UpdateBranch(repo, opts.TargetBranch, newCommit);
 
             // 13. Run post-commit hook (notifications only)
-            RunHook("post-commit");
+            try
+            {
+                RunHook("post-commit");
+            }
+            catch
+            {
+                // Ignore post-commit hook errors (AOT compatibility)
+            }
         }
         catch (Exception ex)
         {
